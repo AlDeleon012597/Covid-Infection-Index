@@ -1,0 +1,19 @@
+# Scope of Study
+* What variables most account for COVID infection rates in NYC?
+* Using these variables, how can we create a composite indicator to capture the “overall” vulnerability of communities in NYC?
+* In addressing the two questions above, how can we account for the geographic heterogenous impact of COVID on NYC communities?
+# Approach
+To answer the first question, multiple linear regression (MLR) analysis will be used as a means of selecting the variables that contribute most to the measurement of COVID infection rates in NYC; for the second, variables remaining from this selection will then be used to create a composite indicator using principal component analysis (PCA); and lastly, for the third, the same analyses will be performed using geographically weighted regression (GWR) and geographically weighted PCA (GWPCA).
+Because the zip code is the smallest geography for which COVID data is available, MLR and GWR will be run at the zip code level. This will allow us to investigate the direct relationship between each variable on the spread and impact of COVID. PCA and GWPCA will then be performed at the census tract level to provide a more granular understanding of which communities are impacted.
+
+**MLR Model**. In the MLR model, infection rate of each NYC zip code as our Y (dependent) variable will be regressed against several X (explanatory) variables. This model does not consider the spatial properties of each zip code, that is, the location or proximity of each zip code from each other. Explanatory variables will be tested for collinearity and response variable will be tested for normality. Stepwise regression will be used to select the variables that account for most of the variance in Y. Despite being removed after auto-selection, some variables will be kept for theoretical reasons. Residual diagnostics such as residual plots and heteroscedasticity tests will be iteratively used to access the quality of the model.
+
+**GWR Model**. Once the MLR model is refined, a geographically weighted regression2,3,11 (GWR) will be used with the explanatory variables selected through the above step. This model is a localized version of MLR, one that considers the spatial properties and heterogeneity of NYC zip codes. Moran’s I will be used to test for spatial auto correlation. Like MLR, localized VIFs will be used to assess multicollinearity.
+Grouping Variables. To prepare for PCA and GWPCA, variables will be grouped into subthemes by considering the conceptual relationship between one another. For instance, prior to analysis, it would be reasonable to group the essential worker variables (5-7) into the same subtheme. 
+
+**PCA**. To perform PCA, we will first transform the original values of each variable to “standard scores” by subtracting the mean and dividing by the standard deviation. Principal component analysis (PCA) is then to be conducted for each subtheme. This means that the location and distance of each census tract from each other will not be considered in this analysis. For each subtheme, we calculate the sub-index as a weighted sum of the standardized scores of its variables, where the weights are the loadings of the corresponding variables under the 1st PCA component. PCA will then be run again on the subindices to create the total index itself. Specifically, we standardize the subindices, then run PCA on them, and then calculate the weighted sum. 
+
+**GWPCA**. After running PCA, we will run its geographically weighted counterpart—geographically weighted PCA (GWPCA)7,9. Much like PCA, we will compute a subindex for each subtheme using the first component loadings.  Thereafter we will run GWPCA on the subindices and compute the total index (the overall COVID vulnerability score).
+Both GWR and GWPCA will be carried out using the GWmodel R package5. 
+
+NOTE: THIS IS A SNIPPET OF FULL REPORT
