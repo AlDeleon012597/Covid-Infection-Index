@@ -1,0 +1,218 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(GWmodel)
+library(sp)
+library("spdep")
+form_inf<-INF_RATE ~ AVG_HH + DIS_PER  + RENT35PER + NOINSUR + GROUPQ_PER + HIGHCHOL + OVER65_PER+ESS_WRK
+
+CVD_DATA <- read.csv("/Users/16464/Desktop/FALL 2020/SEMINAR/DATA/ZIP/ZIP_DATA/ZIP_DATA_GWR.csv")
+locs<-cbind(CVD_DATA$Y,CVD_DATA$X)
+xy<-coordinates(locs)
+nb<-knn2nb(knearneigh(xy))
+plot(locs)
+```
+
+```{r}
+library(ape)
+CVD_DATA.dists <- as.matrix(dist(locs))
+CVD_DATA.dists.inv <- 1/CVD_DATA.dists
+diag(CVD_DATA.dists.inv) <- 0
+Moran.I(CVD_DATA$INF_RATE, CVD_DATA.dists.inv)
+```
+
+```{r}
+Moran.I(CVD_DATA$INF_RATE, CVD_DATA.dists.inv)
+```
+
+```{r}
+moranmc<-moran.mc(CVD_DATA$INF_RATE,nb2listw(nb),nsim=999,alternative="greater")
+moranmc$statistic
+```
+
+```{r}
+form_inf
+```
+
+```{r}
+library(GWmodel)
+CVD_SD <- SpatialPointsDataFrame(locs, CVD_DATA)
+bw_inf_gw<-GWmodel::bw.gwr(form_inf, CVD_SD, approach="AIC",kernel="gaussian",adaptive=FALSE,longlat=FALSE)
+inf_diag<-gwr.collin.diagno(form_inf, CVD_SD, bw_inf_gw, kernel="gaussian")
+#p_inf<-gwr.montecarlo(form_inf,CVD_SD,nsims=99,kernel="gaussian",adaptive=TRUE,bw=bw_inf_gw)
+
+gwr_inf_fit_1<-gwr.basic(form_inf, data=CVD_SD, bw=bw_inf_gw, kernel="gaussian",adaptive=FALSE,F123.test=TRUE)
+inf_p_adjust<-gwr.t.adjust(gwr_inf_fit_1)
+gwr_inf_fit_1
+CVD_SD
+```
+
+```{r}
+library(plyr)
+sdf_inf_1<-as.data.frame(gwr_inf_fit_1$SDF,"ZIPCODE"=CVD_DATA$ZIPCODE)
+#write.csv(sdf_inf_1,'/Users/16464/Desktop/FALL 2020/SEMINAR/DATA/ZIP/ZIP_DATA/ZIP_INF_GWR_1.csv')
+```
+
+```{r}
+library(GWmodel)
+CVD_DATA_TRACT<- read.csv("/Users/16464/Desktop/FALL 2020/SEMINAR/DATA/TRACT/TRACT_FINAL/CT_PCA_FINAL_LOCS1.csv")
+locs_tracts<-cbind(CVD_DATA_TRACT$LONG,CVD_DATA_TRACT$LAT)
+health_age<-c('HIGHCH','DISABLED','OVER65_PER')
+socioecon<-c('ESS_WRK', 'RENT35PER','NOINSUR')
+CVD_DATA_TRACT[health_age] <- lapply(CVD_DATA_TRACT[health_age], function(x) c(scale(x)))
+CVD_DATA_TRACT[socioecon] <- lapply(CVD_DATA_TRACT[socioecon], function(x) c(scale(x)))
+CVD_SD_TRACTS <- SpatialPointsDataFrame(locs_tracts, CVD_DATA_TRACT)
+
+CVD_DATA_TRACT$HSELIV<-scale(CVD_DATA_TRACT$AVG_HH)
+
+houseliv.index <-CVD_DATA_TRACT[c('HSELIV','boro_ct201')]
+houseliv.index
+```
+
+```{r}
+bw_inf_pca<-bw.gwpca(CVD_SD_TRACTS, health_age,kernel="gaussian",adaptive=TRUE,k=3)
+gw.pca.health_age<-gwpca(CVD_SD_TRACTS,vars=health_age,k=3,bw=bw_inf_pca,adaptive=FALSE)
+
+loadings.healthage<-gw.pca.health_age$loadings
+loadings.healthage.pc1<-loadings.healthage[, , 1]
+
+pc1_pv<-as.data.frame(gw.pca.health_age$local.PV)[1]
+colnames(pc1_pv)<-c('PC1_HLTAGE')
+
+healthage.index<-data.frame(loadings.healthage.pc1,"PC1_HLTAGE"=pc1_pv$PC1_HLTAGE,boro_ct201=CVD_SD_TRACTS$boro_ct201)
+```
+```{r}
+loadings.healthage
+```
+
+```{r}
+#house_liv<-c('AVG_HH', 'GROUPQ_PER')
+#
+#bw_inf_pca<-bw.gwpca(CVD_SD_TRACTS, house_liv,kernel="gaussian",adaptive=TRUE,k=2)
+#gw.pca.house_liv<-gwpca(CVD_SD_TRACTS,vars=house_liv,k=2,bw=bw_inf_pca,adaptive=TRUE)
+#
+#loadings.houseliv<-gw.pca.house_liv$loadings
+#loadings.houseliv.pc1<-loadings.houseliv[, , 1]
+#
+#pc1_pv<-as.data.frame(gw.pca.house_liv$local.PV)[1]
+#colnames(pc1_pv)<-c('PC1_HSELIV')
+#
+#houseliv.index<-data.frame(loadings.houseliv.pc1,"PC1_HSELIV"=pc1_pv$PC1_HSELIV,boro_ct=CVD_SD_TRACTS$boro_ct201)
+
+```
+
+```{r}
+CVD_DATA_TRACT
+CVD_DATA_TRACT[c('HSELIV')]<-scale(CVD_DATA_TRACT[c('AVG_HH')])
+houseliv.index<-CVD_DATA_TRACT[c('HSELIV','boro_ct201')]
+CVD_DATA_TRACT[c('HSELIV')]
+```
+
+```{r}
+socioecon<-c('ESS_WRK', 'RENT35PER','NOINSUR')
+
+bw_inf_pca<-bw.gwpca(CVD_SD_TRACTS, socioecon,kernel="gaussian",adaptive=TRUE,k=3)
+gw.pca.socioecon<-gwpca(CVD_SD_TRACTS,vars=socioecon,k=3,bw=bw_inf_pca,adaptive=TRUE,scores=TRUE)
+
+loadings.socioecon<-gw.pca.socioecon$loadings
+loadings.socioecon.pc1<-loadings.socioecon[, , 1]
+
+pc1_pv<-as.data.frame(gw.pca.socioecon$local.PV)[1]
+colnames(pc1_pv)<-c('PC1_SOCECON')
+
+socioecon.index<-data.frame(loadings.socioecon.pc1,"PC1_SOCECON"=pc1_pv$PC1_SOCECON,boro_ct201=CVD_SD_TRACTS$boro_ct201)
+```
+```{r}
+socioecon.index
+healthage.index
+```
+```{r}
+data.matrix(CVD_DATA_TRACT[c('ESS_WRK', 'RENT35PER','NOINSUR')]) %*% matrix(loadings.socioecon.pc1[1:1,])
+```
+
+```{r}
+test1<-data.matrix(CVD_DATA_TRACT[c('ESS_WRK', 'RENT35PER','NOINSUR')]) %*% matrix(loadings.socioecon.pc1[1:1,])
+
+test2<-data.matrix(CVD_DATA_TRACT[c('ESS_WRK', 'RENT35PER','NOINSUR')]) %*% matrix(loadings.socioecon.pc1[2:2,])
+test1[1]
+test1[2]
+```
+
+```{r}
+gw.pca.socioecon$gwpca.scores[2]
+```
+
+```{r}
+houseliv.index
+healthage.index
+socioecon.index
+```
+
+```{r}
+library(dplyr)
+final_index<-merge(merge(socioecon.index,houseliv.index),healthage.index)
+final_index$LAT<-CVD_DATA_TRACT$LAT
+final_index$LONG<-CVD_DATA_TRACT$LONG
+final_index
+
+final_index<-final_index %>% 
+  dplyr::rename(
+    ESS_WRK_LD = ESS_WRK,
+    RENT35_LD = RENT35PER,
+    NOINSUR_LD=NOINSUR,
+    HIGHCH_LD=HIGHCH,
+    DISABL_LD=DISABLED,
+    OVER65_LD=OVER65_PER
+    )
+#CVD_SD_TRACTS_FINAL <- SpatialPointsDataFrame(cbind(final_index$LONG,final_index$LAT), final_index)
+#CVD_SD_TRACTS_FINAL
+#merge(CVD_DATA_TRACT,final_index)
+```
+```{r}
+final_index$SOCIOECON<-scale(rowSums(CVD_DATA_TRACT[c('ESS_WRK', 'RENT35PER','NOINSUR')]*final_index[c('ESS_WRK_LD', 'RENT35_LD','NOINSUR_LD')]))
+final_index$HLTHAGE<-scale(rowSums(CVD_DATA_TRACT[c('HIGHCH', 'DISABLED','OVER65_PER')]*final_index[c('HIGHCH_LD', 'DISABL_LD','OVER65_LD')]))
+
+
+CVD_SD_TRACTS_FINAL <- SpatialPointsDataFrame(cbind(final_index$LONG,final_index$LAT), final_index)
+CVD_SD_TRACTS_FINAL
+```
+
+
+```{r}
+covidindex<-c('SOCIOECON', 'HLTHAGE','HSELIV')
+
+bw_inf_pca<-bw.gwpca(CVD_SD_TRACTS_FINAL, covidindex,kernel="gaussian",adaptive=FALSE,k=3)
+gw.pca.covidindex<-gwpca(CVD_SD_TRACTS_FINAL,vars=covidindex,k=3,bw=bw_inf_pca,adaptive=FALSE,scores=TRUE)
+
+loadings.covidindex<-gw.pca.covidindex$loadings
+loadings.loadings.covidindex.pc1<-loadings.covidindex[, , 1]
+
+pc1_pv<-as.data.frame(gw.pca.covidindex$local.PV)[1]
+colnames(pc1_pv)<-c('PC1_CII')
+
+covid.index<-data.frame(loadings.loadings.covidindex.pc1,"PC1_CII"=pc1_pv$PC1_CII,boro_ct201=CVD_SD_TRACTS$boro_ct201)
+covid.index<-covid.index %>% 
+  dplyr::rename(
+    SOCIOECON_LD = SOCIOECON,
+    HLTHAGE_LD = HLTHAGE,
+    HSELIV_LD=HSELIV,
+
+  )
+```
+
+```{r}
+loadings.loadings.covidindex.pc1
+```
+
+```{r}
+
+final_index_CII<-merge(covid.index,final_index)
+final_index_CII$CII<-rowSums(final_index_CII[c('SOCIOECON', 'HLTHAGE','HSELIV')]*final_index_CII[c('SOCIOECON_LD', 'HLTHAGE_LD','HSELIV_LD')])
+final_index_CII$CII_SCALE<- (final_index_CII$CII - min(final_index_CII$CII))/(max(final_index_CII$CII)-min(final_index_CII$CII))
+write.csv(final_index_CII,"/Users/16464/Desktop/FALL 2020/SEMINAR/DATA/TRACT/TRACT_FINAL/GWPCA_FINAL_CII_2.csv")
+```
+
+
